@@ -18,11 +18,14 @@ Prerequisites: [`uv`](https://github.com/astral-sh/uv) (used to bootstrap a rece
 
 ```bash
 cd mystmd
+python3 scripts/sync_notebooks.py      # once per checkout / after lectures/ changes
 myst start                             # dev server on http://localhost:3000
 myst build --html                      # static site into _build/html/
 ```
 
-Requires the [mystmd CLI](https://mystmd.org/guide/installing). The repo also ships a GitHub Actions workflow ([`../.github/workflows/deploy-myst.yml`](../.github/workflows/deploy-myst.yml)) that builds and publishes to GitHub Pages on every push to **`main`** touching either `mystmd/**` or the workflow file itself, plus manual runs via `workflow_dispatch`. (The workflow is in its own path filter because a change to the renderer pin lives there, not under `mystmd/`, and must still trigger a rebuild.)
+The sync step copies the companion notebooks from `../lectures/` into the gitignored `notebooks/` folder — the TOC lists one page per notebook, so a build without it fails on missing files. It is idempotent and also runs inside `convert.sh` and the CI workflow.
+
+Requires the [mystmd CLI](https://mystmd.org/guide/installing). The repo also ships a GitHub Actions workflow ([`../.github/workflows/deploy-myst.yml`](../.github/workflows/deploy-myst.yml)) that builds and publishes to GitHub Pages on every push to **`main`** touching `mystmd/**`, `lectures/**` (the companion notebooks render as pages), or the workflow file itself, plus manual runs via `workflow_dispatch`. (The workflow is in its own path filter because a change to the renderer pin lives there, not under `mystmd/`, and must still trigger a rebuild.)
 
 Publishing is deliberately tied to `main` alone: the published site should mirror the book's released state, and a feature branch publishing to the same Pages target would make the live site reflect whichever branch pushed last. While conversion work is in flight on a branch, verify with a local `myst build --html` or dispatch the workflow manually against that ref.
 
@@ -38,6 +41,10 @@ With GitHub Pages set to build from GitHub Actions, the site publishes to `https
 | `myst.yml` | mystmd renderer config (project layout, KaTeX math macros) | ✅ |
 | `tikz_overrides.py` | Map from `fig-…` label → rendered SVG path; written by `scripts/render_tikz.py` and read by the upstream postprocess | ✅ |
 | `scripts/render_tikz.py` | Discovers `\begin{tikzpicture}` blocks in source, compiles to SVG via pdflatex + pdf2svg, updates `tikz_overrides.py` | ✅ |
+| `scripts/sync_notebooks.py` | Copies `../lectures/**/code/*.ipynb` into `notebooks/` (with a frontmatter cell pointing source links back at `lectures/`) so the build renders each as a page | ✅ |
+| `scripts/update_appendix.py` | Generates `appG_notebooks.md` + the notebook TOC block in `myst.yml`, and linkifies in-text `*.ipynb` mentions in the converted chapters; `--check` mode is the CI drift guard (issue #32) | ✅ |
+| `appG_notebooks.md` | Web-only Appendix G listing all companion notebooks — generated, do not hand-edit | ✅ |
+| `notebooks/` | Build-time copies of the companion notebooks, one rendered page each | gitignored |
 | `figures/` | Compiled SVGs / curated raster figures | ✅ |
 | `references.bib` | Bibliography (mirror of `../readings/bibliography.bib`, copied during convert) | ✅ |
 | `index.md`, `preface.md`, `notation.md`, `ch??_*.md`, `appA…F_*.md` | Conversion output — 23 files (12 chapters + 6 appendices + 5 frontmatter) | ✅ |

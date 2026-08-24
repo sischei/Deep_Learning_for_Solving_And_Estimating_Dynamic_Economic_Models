@@ -1,18 +1,33 @@
-# Build the MyST Markdown version of the script and deploy to GitHub Pages.
+# Build the MyST Markdown version of the script, and deploy to GitHub Pages.
 #
-# Publishing is driven by `main` only. The published site should mirror the
-# book's released state, so the branch that publishes is the branch that is
-# released — a feature branch publishing to the same Pages target means the
-# live site reflects whichever branch pushed most recently, which is not a
-# property anyone can reason about.
+# Two jobs, deliberately split:
+#
+#   build   runs on push to `main`, on pull requests, and on manual dispatch.
+#           It compiles the renderer, builds the site, and runs the renderer
+#           coupling guard below. It never publishes.
+#   deploy  runs only when the event is NOT a pull request. It holds the
+#           elevated Pages permissions and the `pages` concurrency group.
+#
+# Publishing is still driven by `main` only. The published site should mirror
+# the book's released state, so the branch that publishes is the branch that is
+# released — a feature branch publishing to the same Pages target means the live
+# site reflects whichever branch pushed most recently, which is not a property
+# anyone can reason about. The `pull_request` trigger added here does not change
+# that: PRs build, they do not publish.
+#
+# Why PRs need to build at all. This workflow's renderer pin (`qe-v10`, below)
+# is COUPLED to the converter pin in mystmd/.tool-version, and the coupling is
+# the strict kind — a stale renderer corrupts pages rather than failing. Without
+# a `pull_request` trigger the first build of a pin change happened *after* it
+# merged, against the branch that publishes — and a merge to `main` publishes
+# the book, so the blast radius of a bad pin is the live site.
 #
 # `workflow_dispatch` stays, so a maintainer can still publish on demand from
-# whatever ref they select.
-#
-# Note for review: while the conversion work lives on `mystmd-conversion`,
-# this means the deployed preview does not refresh on pushes to that branch.
-# Verify changes with a local `myst build --html`, or trigger the workflow
-# manually against the branch.
+# whatever ref they select — subject to the `github-pages` environment's
+# deployment branch policy, which lists the refs allowed to deploy at all. A
+# dispatch from a branch outside that list builds fine and is then rejected at
+# the deploy job by environment protection (observed 2026-08-19), so add the
+# branch to the environment's allowed list first if the intent is to publish.
 
 name: MyST GitHub Pages Deploy
 on:
@@ -20,37 +35,82 @@ on:
     branches: [main]
     paths:
       - 'mystmd/**'
+      - 'lectures/**'
+      - '.github/workflows/deploy-myst.yml'
+  pull_request:
+    paths:
+      - 'mystmd/**'
+      - 'lectures/**'
       - '.github/workflows/deploy-myst.yml'
   workflow_dispatch:
 
 env:
-  # BASE_URL tells MyST where the site is served from (asset paths)
+  # BASE_URL tells MyST where the site is served from (asset paths). Set at the
+  # workflow level so a PR build produces byte-identical HTML to a deploy build.
   BASE_URL: /${{ github.event.repository.name }}
 
+# Least privilege by default; the deploy job elevates for itself.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# Per-ref, so PR builds queue against themselves rather than against a real
+# publish. Superseded PR builds are cancelled; pushes to main are never
+# cancelled. The deploy job additionally holds the global `pages` group.
 concurrency:
-  group: 'pages'
-  cancel-in-progress: false
+  group: myst-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
+    # A healthy build is ~5 min. The default job timeout is 6 HOURS, and a
+    # `main` deploy on 2026-08-19 hung in apt-get for 37 minutes before being
+    # cancelled by hand — with a PR trigger now doubling the run count, an
+    # unattended hang is worth bounding.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: mystmd
     steps:
       - uses: actions/checkout@v7
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
+      - name: Sync companion notebooks
+        # The myst.yml TOC lists one page per companion notebook, but the
+        # .ipynb files under mystmd/notebooks/ are gitignored — lectures/ is
+        # the single source of truth and the copies exist only at build time.
+        # Without this step the build fails on missing TOC files. (issue #32)
+        run: python3 scripts/sync_notebooks.py
+      - name: Companion notebook consistency check
+        # The Appendix G listing, the myst.yml notebook TOC, and the in-text
+        # notebook links are committed artifacts generated from the lectures/
+        # tree by scripts/update_appendix.py (run via `bash mystmd/convert.sh`).
+        # A notebook rename/add/delete that lands without regenerating them
+        # would publish broken links; `lectures/**` is in the paths filter
+        # above precisely so this check sees those PRs. Runs before the
+        # expensive installs to fail fast.
+        run: python3 scripts/update_appendix.py --check
       - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y imagemagick webp
+        # ~50 s when healthy (imagemagick + webp are real installs, 31
+        # packages — not on the runner image). Hardened after four incidents
+        # on 2026-08-19 where the runner's primary apt mirror
+        # (azure.archive.ubuntu.com) blackholed and apt hung at the same
+        # deterministic point on every run, despite the fallback mirror
+        # answering instantly. The mirror pin below is the actual fix; the
+        # Acquire timeouts bound individual requests; the step timeout is the
+        # backstop that names this step in the failure instead of letting a
+        # hang read as a slow MyST build.
+        timeout-minutes: 10
+        run: |
+          # The runner image routes apt through mirror+file:/etc/apt/apt-mirrors.txt
+          # with azure.archive.ubuntu.com first. When that mirror blackholes, the
+          # mirror method wedges at a deterministic point even though the fallback
+          # answers instantly, and Acquire timeouts do not unwedge it (verified on
+          # two runs, identical stall line). Pin the healthy mirror instead.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\n' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          fi
+          APT_OPTS='-o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 -o Acquire::Retries=2'
+          sudo apt-get $APT_OPTS update
+          sudo apt-get $APT_OPTS install -y imagemagick webp
       - uses: actions/setup-node@v7
         with:
           node-version: 22.x
@@ -71,6 +131,8 @@ jobs:
         # corrupts pages rather than merely forfeiting a fix — unlike R26's
         # qe-v9 coupling (QuantEcon/claude-latex-to-myst#201, per-row align
         # numbering), which fails silently. Both pins move in one commit.
+        # The "Renderer coupling guard" step below turns that corruption from
+        # silent into a build failure.
         # Checkout is by tag name; the qe-v10 commit is
         # 12a8b26b200703c7d22bba2531cf497b7baa23c2.
         working-directory: /tmp
@@ -82,11 +144,133 @@ jobs:
           bun run build
           npm install -g /tmp/qe-mystmd/packages/mystmd
       - name: Build HTML Assets
-        run: myst build --html
+        run: |
+          set -o pipefail
+          myst build --html 2>&1 | tee /tmp/myst-build.log
+      - name: Renderer coupling guard
+        # The one failure this workflow could not previously see: `myst build`
+        # SUCCEEDS with a stale renderer, and simply emits `{.unnumbered}` as
+        # literal heading text with a polluted auto-slug (so anchors and the
+        # cross-references pointing at them break too).
+        #
+        # Scope matters. _build/html/build/ holds MyST's staged copies of the
+        # SOURCE .md, which contain the literal `{.unnumbered}` syntax by
+        # definition — 24 files on a healthy build. Excluding that directory,
+        # a correct renderer leaves zero occurrences anywhere in the output
+        # (verified against a local qe-v10 build); the page .json carries the
+        # rendered heading text, so a stale renderer shows up there.
+        run: |
+          # A guard must hold itself to its own standard: distinguish grep's
+          # "no match" (exit 1) from "could not run" (exit 2+), and fail loudly
+          # on the latter instead of printing OK. `|| status=$?` keeps the
+          # bare grep from tripping the runner's `bash -e` on a clean pass.
+          if [ ! -d _build/html ]; then
+            echo "::error::_build/html is missing — the build produced no output to check."
+            exit 1
+          fi
+          status=0
+          grep -rl '{\.unnumbered}' _build/html --exclude-dir=build > /tmp/unnumbered-hits || status=$?
+          if [ "$status" -eq 0 ]; then
+            echo "::error::Stale renderer: '{.unnumbered}' is rendering as literal text."
+            echo "The renderer pin in this workflow is out of step with mystmd/.tool-version."
+            echo "Affected output files:"
+            cat /tmp/unnumbered-hits
+            exit 1
+          elif [ "$status" -ne 1 ]; then
+            echo "::error::grep failed (exit $status) — the guard could not run."
+            exit "$status"
+          fi
+          echo "OK — no literal '{.unnumbered}' in rendered output."
+      - name: Build summary
+        if: always()
+        # myst emits one line per warning marked with a warning sign, and a
+        # "Built N pages" summary. The TAIL of the log is HTTP GETs from the
+        # theme's static export server, so tailing it surfaces nothing useful --
+        # extract the signal instead.
+        #
+        # The baseline is 9, and it is worth being precise about what they are,
+        # because mystmd/VALIDATION.md records "2 warnings, 0 errors":
+        #
+        #   1. ch03_irbc.md missing heading depth 4   ) the two \paragraph
+        #   2. ch09_surrogates_gps.md missing depth 4 ) commands kept by design
+        #   3. an oversized PNG that is slow to convert to webp
+        #   4-9. companion notebooks (issue #32), all benign upstream content:
+        #        3x "Removing matplotlib string from outputs"
+        #          (python_basics_11_basic_plotting), and 3x missing heading
+        #          depth (python_basics_8_classes, lecture_02_02, lecture_09_11).
+        #
+        # VALIDATION.md documents (1) and (2) and omits (3), so its count is one
+        # low. Verified against the 3edf991 deploy as well, so this is a
+        # longstanding doc discrepancy rather than a regression. The baseline
+        # here tracks what the build actually emits.
+        #
+        # A change in the count is annotated but does not fail the build. Note
+        # that warning (3) carries a content hash in its filename, so the text
+        # varies between builds even though the count does not.
+        run: |
+          LOG=/tmp/myst-build.log
+          if [ ! -f "$LOG" ]; then
+            echo "### MyST build — no build log produced" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          BASELINE=9
+          WARNINGS=$(grep -c '⚠️' "$LOG" || true)
+          BUILT=$(grep '📚 Built' "$LOG" | tail -n 1 | sed 's/^[[:space:]]*//' || true)
+          CONVERTER=$(cut -c1-7 "${GITHUB_WORKSPACE}/mystmd/.tool-version")
+          {
+            echo "### MyST build — \`${GITHUB_EVENT_NAME}\`"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| renderer | \`qe-v10\` |"
+            echo "| converter | \`${CONVERTER}\` |"
+            echo "| warnings | ${WARNINGS} (baseline ${BASELINE}) |"
+            echo "| result | ${BUILT:-unknown} |"
+            if [ "${WARNINGS}" -gt 0 ]; then
+              echo ""
+              echo "<details><summary>Warnings</summary>"
+              echo ""
+              echo '```'
+              grep '⚠️' "$LOG" || true
+              echo '```'
+              echo ""
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${WARNINGS}" -ne "${BASELINE}" ]; then
+            echo "::warning::MyST build warning count is ${WARNINGS}, baseline is ${BASELINE} (two \paragraph depth-4 headings kept by design, one oversized-PNG webp warning, six benign companion-notebook warnings) -- review what changed."
+          fi
       - name: Upload artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: 'mystmd/_build/html'
+
+  deploy:
+    needs: build
+    # PRs build but never publish.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # The global Pages group: real publishes serialise and are never cancelled.
+    concurrency:
+      group: 'pages'
+      cancel-in-progress: false
+    steps:
+      - name: Setup Pages
+        # Lives here rather than in `build` because it needs `pages` scope, and
+        # `build` deliberately holds only `contents: read` so a PR build runs
+        # with the same permissions a fork PR would get. Its outputs (base_url,
+        # origin) are not consumed anywhere — BASE_URL is set in the workflow
+        # env — so nothing in the build depends on it having run.
+        uses: actions/configure-pages@v6
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

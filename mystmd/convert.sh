@@ -138,3 +138,17 @@ bash "$TOOL_DIR/scripts/convert.sh" \
 # Add any project-specific steps below — they run after the shared pipeline
 # but as part of the same `bash mystmd/convert.sh` invocation, so a single
 # command covers the whole regen workflow.
+
+# Companion notebooks (issue #32): sync lectures/**/code/*.ipynb into
+# notebooks/ (gitignored; needed by `myst build`), then regenerate the
+# Appendix G listing + myst.yml notebook TOC and linkify the in-text
+# `*.ipynb` mentions in the freshly converted chapters. Must run after the
+# pipeline — the linkifier edits generated files. Same uv/python3 fallback
+# rationale as render_tikz.py above.
+if command -v uv >/dev/null 2>&1; then
+  uv run --no-project python "$SCRIPT_DIR/scripts/sync_notebooks.py"
+  uv run --no-project python "$SCRIPT_DIR/scripts/update_appendix.py"
+else
+  python3 "$SCRIPT_DIR/scripts/sync_notebooks.py"
+  python3 "$SCRIPT_DIR/scripts/update_appendix.py"
+fi

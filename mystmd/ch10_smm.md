@@ -98,7 +98,7 @@ $$
 \ell_\rho = \frac{1}{N}\sum_{i=1}^N \bigl|\mathcal{N}_\rho(S_i, t_i, \sigma_i, r_i, K_i) - V_i\bigr|^2.
 $$
 
-Once trained, the surrogate provides instant evaluation at any $(S, t, \sigma, r, K)$ in a single forward pass, instant Greeks ($\Delta$, $\Gamma$, Vega, etc.) via a single backward pass, and gradient-based implied volatility calibration, none of which require re-solving the PDE. The key contrast with the PINN is that the surrogate requires *solved* training data (here from the analytical formula; in general, from a numerical solver), but in return it treats the model parameters $(\sigma, r, K)$ as inputs, enabling re-evaluation across the entire parameter space without re-solving. This is precisely the "pseudo-state" idea of the previous section. See the companion notebook `01_Surrogate_Primer.ipynb` for the full implementation.
+Once trained, the surrogate provides instant evaluation at any $(S, t, \sigma, r, K)$ in a single forward pass, instant Greeks ($\Delta$, $\Gamma$, Vega, etc.) via a single backward pass, and gradient-based implied volatility calibration, none of which require re-solving the PDE. The key contrast with the PINN is that the surrogate requires *solved* training data (here from the analytical formula; in general, from a numerical solver), but in return it treats the model parameters $(\sigma, r, K)$ as inputs, enabling re-evaluation across the entire parameter space without re-solving. This is precisely the "pseudo-state" idea of the previous section. See the companion notebook [`01_Surrogate_Primer.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_01_Surrogate_Primer.ipynb) for the full implementation.
 
 ## Brock–Mirman with Parameters as Pseudo-States
 
@@ -220,7 +220,7 @@ For $S$ independent simulated panels each of length $\tau T$ (with $\tau \geq 1$
 
 The exercise uses a deliberately simple synthetic-data workflow so that the econometric logic is transparent. First, choose a true parameter and simulate a time series from the trained pseudo-state surrogate. These observations play the role of data. Second, for each candidate parameter, re-simulate the model with the same burn-in length, simulation horizon, initial state, and shock seed. Third, compute a small vector of economically interpretable moments and minimize the quadratic SMM criterion with identity weighting.
 
-**Single-parameter persistence exercise.** Notebook `lecture_15_03_Structural_Estimation_BM.ipynb` calibrates $\beta=0.96$, sets $\varrho_{\mathrm{true}}=0.90$, and estimates $\varrho\in[0.50,0.99]$. Let $\{C_t(\varrho),I_t(\varrho),Y_t(\varrho)\}_{t=1}^T$ denote a simulated sample at candidate persistence $\varrho$. The estimator uses three moments:
+**Single-parameter persistence exercise.** Notebook [`lecture_15_03_Structural_Estimation_BM.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03_Structural_Estimation_BM.ipynb) calibrates $\beta=0.96$, sets $\varrho_{\mathrm{true}}=0.90$, and estimates $\varrho\in[0.50,0.99]$. Let $\{C_t(\varrho),I_t(\varrho),Y_t(\varrho)\}_{t=1}^T$ denote a simulated sample at candidate persistence $\varrho$. The estimator uses three moments:
 
 $$
 \begin{align}
@@ -242,7 +242,7 @@ All three moments are computed on the raw simulated time series with no detrendi
 
 so the familiar $1/(1-\varrho^2)$ amplification applies to the *level* of log productivity, not to first differences. The notebook also reports the mean savings rate as a diagnostic and correctly treats it as nearly uninformative for $\varrho$; it is masked out of the SMM criterion in the scalar exercise and used only for visual identification checks.
 
-**Joint exercise.** Notebook `lecture_15_03b_Structural_Estimation_BM_Joint.ipynb` estimates $\theta=(\beta,\varrho)$, with $\beta\in[0.92,0.99]$ and $\varrho\in[0.50,0.99]$. It uses four candidate moments: mean savings, growth volatility, consumption-growth autocorrelation, and output autocorrelation. The *shallow-ridge two-moment specification* retains $\{\mathrm{std}(\Delta\log C_t),\,\mathrm{corr}(\Delta\log C_t,\Delta\log C_{t-1})\}$ to expose the partial-identification ridge in the criterion surface; the over-identified specification uses all four moments and collapses the ridge around the synthetic truth. Formally the two-moment case is just-identified ($q=p=2$), so we avoid the econometric term *weak identification* (which refers to a near-singular Jacobian asymptotic regime) and use *shallow-ridge* or *partially-identified* for what the criterion-surface picture actually shows.
+**Joint exercise.** Notebook [`lecture_15_03b_Structural_Estimation_BM_Joint.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03b_Structural_Estimation_BM_Joint.ipynb) estimates $\theta=(\beta,\varrho)$, with $\beta\in[0.92,0.99]$ and $\varrho\in[0.50,0.99]$. It uses four candidate moments: mean savings, growth volatility, consumption-growth autocorrelation, and output autocorrelation. The *shallow-ridge two-moment specification* retains $\{\mathrm{std}(\Delta\log C_t),\,\mathrm{corr}(\Delta\log C_t,\Delta\log C_{t-1})\}$ to expose the partial-identification ridge in the criterion surface; the over-identified specification uses all four moments and collapses the ridge around the synthetic truth. Formally the two-moment case is just-identified ($q=p=2$), so we avoid the econometric term *weak identification* (which refers to a near-singular Jacobian asymptotic regime) and use *shallow-ridge* or *partially-identified* for what the criterion-surface picture actually shows.
 
 **A deterministic objective.** Because the same initial condition and random seed are used for every candidate $\theta$, the map $\theta\mapsto m(\theta)$ is deterministic in the notebooks. This is still standard SMM; the fixed seed is a common-random-numbers device that removes irrelevant simulation noise while we study identification and optimization. In more realistic estimation exercises one averages over multiple replications or increases the simulation length to make Monte Carlo noise negligible. One consequence is worth stating explicitly: because the synthetic data come from the trained surrogate evaluated at the true parameter, and every candidate evaluates the same shock sequence, the SMM criterion attains a near-zero minimum at the truth. This is a clean self-consistency test of the surrogate-SMM pipeline, not a claim about the size of the criterion one would see with real data and independent simulation draws.
 
@@ -289,7 +289,7 @@ where $\hat{M}$ and $\hat{\Sigma}$ are estimated at $\hat{\theta}$ under the equ
 ## GP Surrogate over the Moment Map
 ```{prf:remark} Scope of this section
 
- The simplified core notebooks `lecture_15_03_Structural_Estimation_BM.ipynb` and `lecture_15_03b_Structural_Estimation_BM_Joint.ipynb` stop after the direct surrogate-based SMM estimator and its identification diagnostics; they do *not* implement the second-layer Gaussian-process moment surrogate, leave-one-out validation, or Bayesian active learning described below. This section sketches the research-scale extension that a separate companion notebook would add on top of the policy surrogate, and that motivates the GP active-learning workflow used in {ref}`ch-climate`.
+ The simplified core notebooks [`lecture_15_03_Structural_Estimation_BM.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03_Structural_Estimation_BM.ipynb) and [`lecture_15_03b_Structural_Estimation_BM_Joint.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03b_Structural_Estimation_BM_Joint.ipynb) stop after the direct surrogate-based SMM estimator and its identification diagnostics; they do *not* implement the second-layer Gaussian-process moment surrogate, leave-one-out validation, or Bayesian active learning described below. This section sketches the research-scale extension that a separate companion notebook would add on top of the policy surrogate, and that motivates the GP active-learning workflow used in {ref}`ch-climate`.
 ```
 
 
@@ -374,7 +374,7 @@ In the research-scale extension, the second-layer GP fitted to the joint moment 
 
 ```{prf:remark} Hands-on
 
- Notebook `lecture_15_03_Structural_Estimation_BM.ipynb` fits the scalar persistence exercise: a 3-input pseudo-state policy net, common-random-number simulation across a $\varrho$-grid, and an interior SMM estimate with a moment-Jacobian diagnostic. Notebook `lecture_15_03b_Structural_Estimation_BM_Joint.ipynb` performs joint $(\beta,\varrho)$ estimation and visualizes the partial-identification ridge of {numref}`fig-smm_2d_criterion` for the shallow-ridge two-moment specification and the over-identified specification. The second-layer GP-moment-map extension above is left as a research-scale companion.
+ Notebook [`lecture_15_03_Structural_Estimation_BM.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03_Structural_Estimation_BM.ipynb) fits the scalar persistence exercise: a 3-input pseudo-state policy net, common-random-number simulation across a $\varrho$-grid, and an interior SMM estimate with a moment-Jacobian diagnostic. Notebook [`lecture_15_03b_Structural_Estimation_BM_Joint.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03b_Structural_Estimation_BM_Joint.ipynb) performs joint $(\beta,\varrho)$ estimation and visualizes the partial-identification ridge of {numref}`fig-smm_2d_criterion` for the shallow-ridge two-moment specification and the over-identified specification. The second-layer GP-moment-map extension above is left as a research-scale companion.
 ```
 
 
@@ -417,7 +417,7 @@ Worked solutions and guidance for these exercises appear in Appendix {ref}`app-
 ```{exercise}
 :label: ex-ch10-1
 
-**[Computational\] Identification.** In notebook `lecture_15_03_Structural_Estimation_BM.ipynb`, choose two candidate moments and compute the finite-difference Jacobian $\partial m/\partial\varrho$ at $\varrho_{\mathrm{true}}=0.90$. Which moment provides stronger local identification?
+**[Computational\] Identification.** In notebook [`lecture_15_03_Structural_Estimation_BM.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03_Structural_Estimation_BM.ipynb), choose two candidate moments and compute the finite-difference Jacobian $\partial m/\partial\varrho$ at $\varrho_{\mathrm{true}}=0.90$. Which moment provides stronger local identification?
 ```
 
 ```{exercise}
@@ -441,7 +441,7 @@ Worked solutions and guidance for these exercises appear in Appendix {ref}`app-
 ```{exercise}
 :label: ex-ch10-5
 
-**[Advanced/project\] $J$-statistic and overidentification.** In notebook `lecture_15_03b_Structural_Estimation_BM_Joint.ipynb`, use the over-identified specification with $q=4$ moments and $p=2$ parameters. (i) State the asymptotic distribution of the $J$-statistic under correct specification when $W=\Omega^{-1}$. (ii) Compute $J(\hat\theta)$ on the original synthetic sample and report whether the $\chi^2_2$ test rejects at $\alpha=0.05$. (iii) Repeat across Monte Carlo samples generated at the truth and compare the empirical distribution with $\chi^2_2$. (iv) Introduce a structural break in one model parameter and verify that the $J$ distribution shifts to the right.
+**[Advanced/project\] $J$-statistic and overidentification.** In notebook [`lecture_15_03b_Structural_Estimation_BM_Joint.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03b_Structural_Estimation_BM_Joint.ipynb), use the over-identified specification with $q=4$ moments and $p=2$ parameters. (i) State the asymptotic distribution of the $J$-statistic under correct specification when $W=\Omega^{-1}$. (ii) Compute $J(\hat\theta)$ on the original synthetic sample and report whether the $\chi^2_2$ test rejects at $\alpha=0.05$. (iii) Repeat across Monte Carlo samples generated at the truth and compare the empirical distribution with $\chi^2_2$. (iv) Introduce a structural break in one model parameter and verify that the $J$ distribution shifts to the right.
 ```
 
 ```{exercise}
@@ -453,7 +453,7 @@ Worked solutions and guidance for these exercises appear in Appendix {ref}`app-
 ```{exercise}
 :label: ex-ch10-7
 
-**[Advanced/project\] Maximum likelihood vs. SMM efficiency.** Suppose the productivity process $\log z_t$ is observed. Implement the Gaussian AR(1) MLE for $\varrho$ and compare it with the SMM estimator based on the moments in notebook `lecture_15_03_Structural_Estimation_BM.ipynb`. On Monte Carlo replications at several sample sizes, report bias, variance, and MSE. Explain why MLE is efficient for this observed-shock likelihood, while SMM reaches the GMM efficiency bound only for the chosen moment vector. As an optional extension, repeat the beta-only MLE comparison in the full-depreciation log-utility special case where the policy has a closed form.
+**[Advanced/project\] Maximum likelihood vs. SMM efficiency.** Suppose the productivity process $\log z_t$ is observed. Implement the Gaussian AR(1) MLE for $\varrho$ and compare it with the SMM estimator based on the moments in notebook [`lecture_15_03_Structural_Estimation_BM.ipynb`](notebooks/lecture_15_structural_estimation_smm/lecture_15_03_Structural_Estimation_BM.ipynb). On Monte Carlo replications at several sample sizes, report bias, variance, and MSE. Explain why MLE is efficient for this observed-shock likelihood, while SMM reaches the GMM efficiency bound only for the chosen moment vector. As an optional extension, repeat the beta-only MLE comparison in the full-depreciation log-utility special case where the policy has a closed form.
 ```
 
 [^1]: A resource-based variant in which the savings rate is applied to total resources $R_t = Y_t + (1-\delta)K_t$, allowing disinvestment relative to the depreciated stock, is a straightforward alternative; the SMM moments and notebook outputs in this chapter use the output-based savings rate above.

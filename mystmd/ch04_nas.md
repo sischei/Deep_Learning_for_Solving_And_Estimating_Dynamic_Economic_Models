@@ -9,13 +9,13 @@ A terminology note before we begin: in this chapter we use "NAS" loosely to cove
 
 **Hands-on notebooks for this chapter.** Two NAS walkthroughs are provided alongside the ReLoBRaLo notebook, plus the IRBC exercise notebook that doubles as the entry point to this chapter. All four live in the NAS chapter's code folder:
 
-- `02_NAS_Random_Search_10D.ipynb`: a library-free Random Search loop (model in TF/Keras) on a 10-dimensional analytical regression task, used to illustrate the projection argument of {cite:t}`bergstra2012random` in its cleanest form.
+- [`02_NAS_Random_Search_10D.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_02_NAS_Random_Search_10D.ipynb): a library-free Random Search loop (model in TF/Keras) on a 10-dimensional analytical regression task, used to illustrate the projection argument of {cite:t}`bergstra2012random` in its cleanest form.
 
-- `03_NAS_RandomSearch_Hyperband.ipynb`: from-scratch Random Search and Successive Halving (Hyperband's inner loop) on a two-dimensional Genz Gaussian, written in $\sim$25 lines of plain Python so the algorithms in this chapter are visible without library abstraction; after the first run, the cached records in `nas_results/` short-circuit re-runs for instant re-inspection.
+- [`03_NAS_RandomSearch_Hyperband.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_03_NAS_RandomSearch_Hyperband.ipynb): from-scratch Random Search and Successive Halving (Hyperband's inner loop) on a two-dimensional Genz Gaussian, written in $\sim$25 lines of plain Python so the algorithms in this chapter are visible without library abstraction; after the first run, the cached records in `nas_results/` short-circuit re-runs for instant re-inspection.
 
-- `04_Loss_Normalization.ipynb`: the classroom ReLoBRaLo implementation, matched to the notation below.
+- [`04_Loss_Normalization.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_04_Loss_Normalization.ipynb): the classroom ReLoBRaLo implementation, matched to the notation below.
 
-- `05_IRBC_Exercise.ipynb`: the IRBC exercise notebook (closed-form steady-state comparative statics and inverse-loss weighting on a multi-component IRBC residual); it is the notebook referenced by {ref}`ch-irbc` {prf:ref}`ex-ch3-6`–{prf:ref}`ex-ch3-7`, and it reuses the loss-balancing ideas of this chapter on a deliberately small, library-free example.
+- [`05_IRBC_Exercise.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_05_IRBC_Exercise.ipynb): the IRBC exercise notebook (closed-form steady-state comparative statics and inverse-loss weighting on a multi-component IRBC residual); it is the notebook referenced by {ref}`ch-irbc` {prf:ref}`ex-ch3-6`–{prf:ref}`ex-ch3-7`, and it reuses the loss-balancing ideas of this chapter on a deliberately small, library-free example.
 
 ## The Hyperparameter Space
 
@@ -150,7 +150,7 @@ Hyperband bracket schedule for $R = 81$, $\eta = 3$, following Table 1 of {cite
 | $0$ | $(5, 81)$ | $5$@$81$ | $5R$ |
 ````
 
-The companion notebook `03_NAS_RandomSearch_Hyperband.ipynb` implements the SHA inner loop only; the full Hyperband schedule is a straightforward outer loop that iterates this inner loop across the five $(n_s, r_s)$ starting points in {numref}`tab-hyperband_brackets`.
+The companion notebook [`03_NAS_RandomSearch_Hyperband.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_03_NAS_RandomSearch_Hyperband.ipynb) implements the SHA inner loop only; the full Hyperband schedule is a straightforward outer loop that iterates this inner loop across the five $(n_s, r_s)$ starting points in {numref}`tab-hyperband_brackets`.
 
 ## Method Comparison
 
@@ -173,7 +173,7 @@ For the DEQN and PINN applications in this course, random search or Bayesian opt
 
 (sec-nas-implementation)=
 ## Implementing the Search in Practice
-To keep the algorithms transparent, the companion notebook `03_NAS_RandomSearch_Hyperband.ipynb` implements both Random Search (§ {ref}`sec-nas_random_search`) and the Successive Halving Algorithm (§ {ref}`sec-hyperband`) directly in plain Python, with no hyperparameter-search library involved. The search space is encoded as an ordinary dict (number of hidden layers $\in \{1,\ldots,5\}$, units per layer $\in \{32, 64, \ldots, 256\}$, activation function $\in \{\texttt{relu}, \texttt{tanh}, \texttt{swish}\}$, and learning rate log-uniform in $[10^{-4}, 10^{-2}]$), and a single `sample_config(rng)` function draws candidates from it. Random Search is then a $30$-iteration loop that builds, trains, and scores each candidate; Successive Halving is the same loop wrapped in a halving schedule ($n_0 = 27$ candidates at $r_0 = 8$ epochs $\to$ $9$ at $24$ $\to$ $3$ at $72$ $\to$ winner, with $\eta = 3$). Both implementations fit on a single slide and reproduce the qualitative finding of {cite:t}`li2018hyperband` that Successive Halving reaches comparable accuracy to Random Search at substantially lower compute: in the notebook run, the same MAE is recovered with $\sim 2.3\times$ less compute (648 SHA config-epochs vs. 1500 for 30 Random Search trials at 50 epochs each) at a comparable number of architectures (27 vs. 30). The precise multipliers are notebook-specific; the magnitudes reported in Li et al. vary by benchmark.
+To keep the algorithms transparent, the companion notebook [`03_NAS_RandomSearch_Hyperband.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_03_NAS_RandomSearch_Hyperband.ipynb) implements both Random Search (§ {ref}`sec-nas_random_search`) and the Successive Halving Algorithm (§ {ref}`sec-hyperband`) directly in plain Python, with no hyperparameter-search library involved. The search space is encoded as an ordinary dict (number of hidden layers $\in \{1,\ldots,5\}$, units per layer $\in \{32, 64, \ldots, 256\}$, activation function $\in \{\texttt{relu}, \texttt{tanh}, \texttt{swish}\}$, and learning rate log-uniform in $[10^{-4}, 10^{-2}]$), and a single `sample_config(rng)` function draws candidates from it. Random Search is then a $30$-iteration loop that builds, trains, and scores each candidate; Successive Halving is the same loop wrapped in a halving schedule ($n_0 = 27$ candidates at $r_0 = 8$ epochs $\to$ $9$ at $24$ $\to$ $3$ at $72$ $\to$ winner, with $\eta = 3$). Both implementations fit on a single slide and reproduce the qualitative finding of {cite:t}`li2018hyperband` that Successive Halving reaches comparable accuracy to Random Search at substantially lower compute: in the notebook run, the same MAE is recovered with $\sim 2.3\times$ less compute (648 SHA config-epochs vs. 1500 for 30 Random Search trials at 50 epochs each) at a comparable number of architectures (27 vs. 30). The precise multipliers are notebook-specific; the magnitudes reported in Li et al. vary by benchmark.
 
 **Production tooling (footnote).** Real projects rarely hand-roll the search loop. Several established libraries wrap (and parallelize) the same algorithms behind uniform APIs: `KerasTuner`[^1] (Random, Bayesian, Hyperband; tight Keras integration), `Optuna`[^2] (TPE, CMA-ES, Hyperband, NSGA-II; framework-agnostic), `Ray Tune`[^3] (all of the above plus ASHA and population-based training, distributed by design), `Hyperopt`[^4] (the original TPE reference), `Ax` / `BoTorch`[^5] (PyTorch-native multi-objective Bayesian optimization), `NNI`[^6] (Microsoft; full graph-NAS support), and `AutoKeras`[^7] (full AutoML pipeline). We deliberately teach the algorithms rather than the wrappers because library APIs change every few years; the underlying search procedures (Random, SHA / Hyperband, GP+EI, TPE) do not. The notebook additionally compares the best NAS-found architecture to a hand-tuned baseline, which makes the pedagogical value of automated search concrete.
 
@@ -203,7 +203,7 @@ $$
 w_k^{(t)} = \frac{\exp(\Delta_k^{(t)}/\tau)}{\sum_{j=1}^K \exp(\Delta_j^{(t)}/\tau)},
 $$
 
-where $\tau > 0$ is a temperature parameter. Components that are decreasing slowly (or increasing) receive higher weight, directing the optimizer's attention to the lagging components. In practice, SoftAdapt uses smoothed rates (averaged over a window of recent iterations) for stability. SoftAdapt is discussed here for context; the companion notebook `04_Loss_Normalization.ipynb` implements equal-, inverse-loss-, and ReLoBRaLo-weighting, and {prf:ref}`ex-ch4-6` asks you to add a GradNorm balancer to the same testbed.
+where $\tau > 0$ is a temperature parameter. Components that are decreasing slowly (or increasing) receive higher weight, directing the optimizer's attention to the lagging components. In practice, SoftAdapt uses smoothed rates (averaged over a window of recent iterations) for stability. SoftAdapt is discussed here for context; the companion notebook [`04_Loss_Normalization.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_04_Loss_Normalization.ipynb) implements equal-, inverse-loss-, and ReLoBRaLo-weighting, and {prf:ref}`ex-ch4-6` asks you to add a GradNorm balancer to the same testbed.
 
 (sec-relobralo)=
 ### ReLoBRaLo: Adaptive Loss Balancing
@@ -270,7 +270,7 @@ An alternative approach proposed by {cite:t}`chen2018gradnorm` directly normaliz
 ```{figure} figures/fig-multi_component_loss.svg
 :name: fig-multi_component_loss
 
-*Stylized* sketch of the multi-component loss-scale problem, drawn to mimic what one typically sees early in a two-country IRBC training run; this is *not* measured data. The three curves are hand-picked exponentials $a_k\,e^{-t/\tau_k}$ (with $a_1{=}50,\tau_1{=}150$; $a_2{=}0.5,\tau_2{=}750$; $a_3{=}5,\tau_3{=}200$), chosen only to make the mechanism visible: at initialization the residuals differ by about two orders of magnitude, and under *uniform* weighting the optimizer drives the largest component $\ell_1$ (blue) down fastest because it dominates the summed gradient, while the smaller-scale but equally important country-2 Euler residual $\ell_2$ (red) decays roughly five times more slowly and is left all but flat next to the others. Adaptive loss balancing such as ReLoBRaLo re-weights the components so that all three decrease at comparable rates. For the *actual* recorded trajectories on this problem, see the companion notebook `04_Loss_Normalization.ipynb`.
+*Stylized* sketch of the multi-component loss-scale problem, drawn to mimic what one typically sees early in a two-country IRBC training run; this is *not* measured data. The three curves are hand-picked exponentials $a_k\,e^{-t/\tau_k}$ (with $a_1{=}50,\tau_1{=}150$; $a_2{=}0.5,\tau_2{=}750$; $a_3{=}5,\tau_3{=}200$), chosen only to make the mechanism visible: at initialization the residuals differ by about two orders of magnitude, and under *uniform* weighting the optimizer drives the largest component $\ell_1$ (blue) down fastest because it dominates the summed gradient, while the smaller-scale but equally important country-2 Euler residual $\ell_2$ (red) decays roughly five times more slowly and is left all but flat next to the others. Adaptive loss balancing such as ReLoBRaLo re-weights the components so that all three decrease at comparable rates. For the *actual* recorded trajectories on this problem, see the companion notebook [`04_Loss_Normalization.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_04_Loss_Normalization.ipynb).
 ```
 
 {numref}`fig-multi_component_loss` illustrates the typical behavior: without adaptive reweighting, the optimizer focuses almost exclusively on $\ell_1$ (the largest component), allowing $\ell_2$ to stagnate; with adaptive loss balancing (e.g., ReLoBRaLo, GradNorm), all components converge at comparable rates. As a concrete reference, an unweighted run of the two-country IRBC training loop in the companion notebook typically prints something like the trace below (numbers indicative, seed-dependent):
@@ -292,7 +292,7 @@ The pathology is immediate: $\ell_1$ drops four orders of magnitude while $\ell_
 ````{table}
 :name: tab-balancing_methods
 
-Summary of adaptive loss-balancing methods. Overhead is a per-step wall-clock cost (additional softmaxes for SoftAdapt/ReLoBRaLo; per-component gradient norms for GradNorm). Quantitative speedups depend strongly on the problem; see the companion notebook `04_Loss_Normalization.ipynb` for problem-specific measurements.
+Summary of adaptive loss-balancing methods. Overhead is a per-step wall-clock cost (additional softmaxes for SoftAdapt/ReLoBRaLo; per-component gradient norms for GradNorm). Quantitative speedups depend strongly on the problem; see the companion notebook [`04_Loss_Normalization.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_04_Loss_Normalization.ipynb) for problem-specific measurements.
 
 | **Method** | **Overhead** | **Hyperparameters** |
 |---|:---:|:---:|
@@ -305,7 +305,7 @@ Summary of adaptive loss-balancing methods. Overhead is a per-step wall-clock co
 | NTK-based {cite:p}`wang2022when` | moderate–high | 0 (data-driven) |
 ````
 
-Quantitative speedup claims depend on the specific problem (PDE vs. Euler residual, number of components, imbalance ratio), the baseline (uniform vs. manually tuned), and the success criterion. The companion notebook `04_Loss_Normalization.ipynb` runs the four methods on a shared multi-scale regression task so that the reader can generate problem-specific numbers rather than rely on headline speedup factors from unrelated benchmarks.
+Quantitative speedup claims depend on the specific problem (PDE vs. Euler residual, number of components, imbalance ratio), the baseline (uniform vs. manually tuned), and the success criterion. The companion notebook [`04_Loss_Normalization.ipynb`](notebooks/lecture_05_nas_loss_normalization/lecture_05_04_Loss_Normalization.ipynb) runs the four methods on a shared multi-scale regression task so that the reader can generate problem-specific numbers rather than rely on headline speedup factors from unrelated benchmarks.
 
 ```{prf:remark} Practical guidance
 

@@ -183,7 +183,7 @@ $\dagger$ Sparse-GP via inducing points reduces $\mathcal{O}(N^3)$ to $\mathca
 
 ### GP Regression in Practice
 
-In code, GP regression is a one-liner once the kernel is chosen. In scikit-learn the standard pattern is to assemble a kernel as the sum of an RBF (`RBF(length_scale=...)`) and a noise term (`WhiteKernel(noise_level=...)`), pass it to `GaussianProcessRegressor`, call `.fit(X_train, y_train)`, and obtain posterior mean and standard deviation from `.predict(X_test, return_std=True)`; the kernel hyperparameters (`length_scale`, `noise_level`, output amplitude) are optimized by maximizing the marginal likelihood, with `n_restarts_optimizer` controlling robustness to local optima. The companion notebook `02_GP_and_BAL.ipynb` provides a full worked example fitting noisy observations of $\sin(x)$ on $[-2,2]$.
+In code, GP regression is a one-liner once the kernel is chosen. In scikit-learn the standard pattern is to assemble a kernel as the sum of an RBF (`RBF(length_scale=...)`) and a noise term (`WhiteKernel(noise_level=...)`), pass it to `GaussianProcessRegressor`, call `.fit(X_train, y_train)`, and obtain posterior mean and standard deviation from `.predict(X_test, return_std=True)`; the kernel hyperparameters (`length_scale`, `noise_level`, output amplitude) are optimized by maximizing the marginal likelihood, with `n_restarts_optimizer` controlling robustness to local optima. The companion notebook [`02_GP_and_BAL.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_02_GP_and_BAL.ipynb) provides a full worked example fitting noisy observations of $\sin(x)$ on $[-2,2]$.
 
 **Application: GP surrogates for option pricing.** GPs are particularly well suited as surrogates for derivative pricing models. For example, one can train a GP on as few as 5–50 Black–Scholes option prices (evaluated at different spot prices or parameter configurations) and obtain a surrogate that accurately reproduces the pricing surface with calibrated uncertainty bands. The posterior variance immediately quantifies the interpolation uncertainty at each query point. This idea extends naturally to stochastic volatility models such as Heston, where the analytical pricing formula is expensive to evaluate. Furthermore, because GP predictions are linear in the training targets, the uncertainty of a *portfolio* of GP-priced instruments propagates analytically: for a linear portfolio $\sum_i w_i \hat{V}_i$ with vector of weights $\bm{w}$ and joint posterior covariance $\Sigma_{\hat{V}}$, $\mathrm{Var}(\bm{w}^\top \hat{V}) = \bm{w}^\top \Sigma_{\hat{V}} \bm{w}$. When the surrogate errors are independent across instruments, $\Sigma_{\hat{V}}$ is diagonal with entries $\sigma_i^2$ and the formula reduces to $\sum_i w_i^2 \sigma_i^2$; otherwise the off-diagonal cross-instrument covariances must be retained, e.g. via a multi-output GP. Either way the assessment is instant.
 
@@ -480,7 +480,7 @@ across VFI iterations is a cheap surrogate-health metric that is independent of 
 
 - A small LOO RMSE coexisting with a large Bellman residual points the finger at the *operator*, not the surrogate: the iterate may be far from the fixed point even though the GP fits the current $TV^{s-1}$ well.
 
-The notebook `04_GP_Value_Function_Iteration.ipynb` computes {eq}`eq-gp_loo` via `scipy.linalg.cho_solve` (function `gp_loo_rmse`) and reports it alongside the Bellman residual at every VFI iteration, separating these two failure modes. The same diagnostic reappears in {ref}`sec-smm_gp_moments` for the GP layer over the SMM moment map.
+The notebook [`04_GP_Value_Function_Iteration.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_04_GP_Value_Function_Iteration.ipynb) computes {eq}`eq-gp_loo` via `scipy.linalg.cho_solve` (function `gp_loo_rmse`) and reports it alongside the Bellman residual at every VFI iteration, separating these two failure modes. The same diagnostic reappears in {ref}`sec-smm_gp_moments` for the GP layer over the SMM moment map.
 
 (sec-gp_dp_bal_inside)=
 ### Active Learning Inside the VFI Loop
@@ -490,7 +490,7 @@ $$
 \x^{\mathrm{next}} \in \argmax_{\x \in \mathcal{X}^\mathrm{cand}} \sigma_\mathrm{GP}^s(\x).
 $$ (eq-bal_vfi)
 
-A practical implementation, used in notebook `04_GP_Value_Function_Iteration.ipynb`, runs the VFI iterations with a frozen design for a few steps, then *enriches* the design every $N$ iterations:
+A practical implementation, used in notebook [`04_GP_Value_Function_Iteration.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_04_GP_Value_Function_Iteration.ipynb), runs the VFI iterations with a frozen design for a few steps, then *enriches* the design every $N$ iterations:
 
 1.  Evaluate $\sigma_\mathrm{GP}^s$ on a dense candidate set $\mathcal{X}^\mathrm{cand}$ (a Latin-hypercube draw over the current state-space region).
 
@@ -508,7 +508,7 @@ A practical implementation, used in notebook `04_GP_Value_Function_Iteration.ipy
 :name: fig-gp_vfi_active_1d
 :width: 100%
 
-Same-budget active enrichment inside one-dimensional GP value-function iteration. The left panel compares the GP posterior means from a fixed Latin-hypercube design and an active design against a reference GP-VFI solution. The middle panel shows the posterior standard deviation and the states added by the active rule {eq}`eq-bal_vfi`, marked as triangles on the horizontal axis. The right panel reports the dense-grid Bellman residual. Unlike the previously used two-dimensional separable interpolation benchmark, every plotted training value here is generated by a Bellman maximization. Generated by notebook `lecture_14_04_GP_Value_Function_Iteration.ipynb`.
+Same-budget active enrichment inside one-dimensional GP value-function iteration. The left panel compares the GP posterior means from a fixed Latin-hypercube design and an active design against a reference GP-VFI solution. The middle panel shows the posterior standard deviation and the states added by the active rule {eq}`eq-bal_vfi`, marked as triangles on the horizontal axis. The right panel reports the dense-grid Bellman residual. Unlike the previously used two-dimensional separable interpolation benchmark, every plotted training value here is generated by a Bellman maximization. Generated by notebook [`lecture_14_04_GP_Value_Function_Iteration.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_04_GP_Value_Function_Iteration.ipynb).
 ```
 
 ### Results: From One to 500 Dimensions
@@ -557,7 +557,7 @@ GP/ASGP and DEQN solvers for dynamic models. The table distinguishes exact fixed
 
 ```{prf:remark} Hands-on
 
- Notebook `04_GP_Value_Function_Iteration.ipynb` implements GP-based VFI for the one-dimensional stochastic growth model. It shows convergence of the GP-VFI outer loop, posterior credible bands for the value-function interpolant, Cholesky-based LOO-RMSE {eq}`eq-gp_loo`, dense-grid Bellman residuals, active enrichment of the Bellman design {eq}`eq-bal_vfi`, policy recovery, and a deterministic full-depreciation verification ($\delta = 1$ and $\sigma = 0$) against the closed-form Brock–Mirman solution. The multidimensional ASGP extension is discussed in the literature summary above and illustrated separately by the active-subspace notebooks, `05_Active_Subspace_2D.ipynb`, `06_Active_Subspace_10D.ipynb`, and `07_Active_Subspace_Nonlinear.ipynb`, on 2D, 10D, and nonlinear test functions.
+ Notebook [`04_GP_Value_Function_Iteration.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_04_GP_Value_Function_Iteration.ipynb) implements GP-based VFI for the one-dimensional stochastic growth model. It shows convergence of the GP-VFI outer loop, posterior credible bands for the value-function interpolant, Cholesky-based LOO-RMSE {eq}`eq-gp_loo`, dense-grid Bellman residuals, active enrichment of the Bellman design {eq}`eq-bal_vfi`, policy recovery, and a deterministic full-depreciation verification ($\delta = 1$ and $\sigma = 0$) against the closed-form Brock–Mirman solution. The multidimensional ASGP extension is discussed in the literature summary above and illustrated separately by the active-subspace notebooks, [`05_Active_Subspace_2D.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_05_Active_Subspace_2D.ipynb), [`06_Active_Subspace_10D.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_06_Active_Subspace_10D.ipynb), and [`07_Active_Subspace_Nonlinear.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_07_Active_Subspace_Nonlinear.ipynb), on 2D, 10D, and nonlinear test functions.
 ```
 
 
@@ -605,7 +605,7 @@ The trade-off relative to a standard GP is clear: DKL offers greater expressiven
 
 ```{prf:remark} Hands-on
 
- The companion notebook `08_Deep_Kernel_Learning.ipynb` implements a simplified DKL pipeline (a supervised feature extractor stacked with a scikit-learn GP head) and compares the learned deep kernel against standard RBF and Matérn GPs on function approximation tasks; the full GPyTorch joint marginal-likelihood training of {eq}`eq-dkl_kernel` is left as an extension.
+ The companion notebook [`08_Deep_Kernel_Learning.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_08_Deep_Kernel_Learning.ipynb) implements a simplified DKL pipeline (a supervised feature extractor stacked with a scikit-learn GP head) and compares the learned deep kernel against standard RBF and Matérn GPs on function approximation tasks; the full GPyTorch joint marginal-likelihood training of {eq}`eq-dkl_kernel` is left as an extension.
 ```
 
 
@@ -693,7 +693,7 @@ Worked solutions and guidance for these exercises appear in Appendix {ref}`app-
 ```{exercise}
 :label: ex-ch9-6
 
-**[Computational\] Sobol sensitivity with a GP surrogate.** Write a short script, or extend notebook `02_GP_and_BAL.ipynb`, to train a GP surrogate on the $4$-dimensional Genz product-peak function $f(\bm x) = \prod_{i=1}^{4}(c_i^{-2} + (x_i - w_i)^2)^{-1}$ on $[0,1]^4$ with $c = (1, 2, 0.5, 1.5)$, $w = (0.4, 0.6, 0.3, 0.7)$, using $N \in \{50, 100, 200\}$ training points. For each $N$, compute the Sobol first-order and total-effect indices in two ways: (i) direct on the true $f$ via $10{,}000$ Monte Carlo samples (reference), (ii) on the GP surrogate via $10^6$ samples (cheap thanks to the surrogate). Plot the relative error in each Sobol index against $N$. Verify that the surrogate-based Sobol estimates converge to the reference as $N$ grows, and identify the $N$ at which all four first-order indices match the reference within $5\%$. Discuss why surrogate-based sensitivity analysis is the workhorse for expensive simulators (climate models, structural macro models) where direct $10^6$-sample Monte Carlo is infeasible.
+**[Computational\] Sobol sensitivity with a GP surrogate.** Write a short script, or extend notebook [`02_GP_and_BAL.ipynb`](notebooks/lecture_14_surrogates_and_gps/lecture_14_02_GP_and_BAL.ipynb), to train a GP surrogate on the $4$-dimensional Genz product-peak function $f(\bm x) = \prod_{i=1}^{4}(c_i^{-2} + (x_i - w_i)^2)^{-1}$ on $[0,1]^4$ with $c = (1, 2, 0.5, 1.5)$, $w = (0.4, 0.6, 0.3, 0.7)$, using $N \in \{50, 100, 200\}$ training points. For each $N$, compute the Sobol first-order and total-effect indices in two ways: (i) direct on the true $f$ via $10{,}000$ Monte Carlo samples (reference), (ii) on the GP surrogate via $10^6$ samples (cheap thanks to the surrogate). Plot the relative error in each Sobol index against $N$. Verify that the surrogate-based Sobol estimates converge to the reference as $N$ grows, and identify the $N$ at which all four first-order indices match the reference within $5\%$. Discuss why surrogate-based sensitivity analysis is the workhorse for expensive simulators (climate models, structural macro models) where direct $10^6$-sample Monte Carlo is infeasible.
 ```
 
 ```{exercise}

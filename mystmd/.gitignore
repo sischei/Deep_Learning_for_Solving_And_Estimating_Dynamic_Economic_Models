@@ -13,5 +13,10 @@ tmp/
 # MyST build output (published via GitHub Actions)
 _build/
 
+# Companion notebooks, synced from ../lectures/ at build time by
+# scripts/sync_notebooks.py — lectures/ is the single source of truth,
+# these copies exist only so the MyST project can render them as pages.
+notebooks/
+
 # Python bytecode from the book-side helper scripts
 __pycache__/
